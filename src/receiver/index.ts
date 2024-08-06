@@ -76,6 +76,7 @@ export const receivingText = computed(() => {
   let text = ""
   for( let i = 0; i < receivingBinary.value.length; i += 16 ){
     const binary = receivingBinary.value.slice(i, i+16)
+    if( binary == "1".repeat(16) ) break
     text += String.fromCharCode(parseInt(binary, 2))
   }
   return text
@@ -108,7 +109,7 @@ const statusChecker = new StatusChecker((status, frameCount) => {
 export const receiver = (p: p5) => {
   let capture: p5.Element
   p.setup = () => {
-    const width = 500
+    const height = (p.windowHeight - 48) / 3
     p.background(0)
     p.noStroke()
 
@@ -117,12 +118,12 @@ export const receiver = (p: p5) => {
       audio: false
     })
     capture.hide()
-    p.createCanvas(width, width * 3 / 4)
+    p.createCanvas(height/2, height)
   }
 
   p.draw = () => {
     p.background(0)
-    p.image(capture, 0, 0, p.width, p.height)
+    p.image(capture, 0, 0, capture.width * p.height / capture.height, p.height)
 
     if( statusChecker.status == "receiving" ) tmpFrameStack.push([])
     drawPoints(p, (x, y) => {
