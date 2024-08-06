@@ -7,8 +7,8 @@
         <button @click="() => send('hello world')">send</button>
         <button @click="setRectDefault">defaultRect</button>
       </div>
-      <div>
-        {{message}}
+      <div >
+        {{receivingText}}
       </div>
     </div>
   </main>
@@ -17,7 +17,7 @@
 import { onMounted, ref } from 'vue';
 import p5 from 'p5';
 import { sender, send } from './sender';
-import { receiver, setRectDefault, message } from './receiver';
+import { receiver, setRectDefault, receivingText } from './receiver';
 
 const senderCanvas = ref<HTMLCanvasElement>()
 const receiverCanvas = ref<HTMLCanvasElement>()

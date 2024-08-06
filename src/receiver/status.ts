@@ -2,7 +2,14 @@ type CornerColor = "white" | "black" | "gray"
 type Status = "syncing" | "receiving" | "idle"
 
 export class StatusChecker {
-  public status: Status = "idle";
+  private _status: Status = "idle";
+  public get status(): Status {
+    return this._status;
+  }
+  private set status(value: Status) {
+    this._status = value;
+    this.onStatusChange(value)
+  }
   
   private static readonly maxFrameRepeatCount = 40
   private static readonly minFrameRepeatCount = 2
@@ -14,14 +21,15 @@ export class StatusChecker {
   private lastCornerColor: CornerColor = "gray"
   
   constructor(
-    private readonly onFrameChange: (status: Status, frameCount: number) => void
+    private readonly onFrameChange: (status: Status, frameCount: number) => void,
+    private readonly onStatusChange: (status: Status) => void
   ){}
 
-  private cancelConnection(reason?: string){
+  public cancelConnection(reason?: string){
     this.frameRepeatCount = 0
     this.frameStackCount = 0
     this.status = "idle"
-    console.log("cancel connection" + (reason ? "\nreason:" + reason : ""))
+    console.warn("[CONNECTION CANCELED] " + reason ?? "")
   }
 
   step( cornersColor: Record<"tl" | "tr" | "bl" | "br", "white" | "black"> ){
@@ -48,7 +56,7 @@ export class StatusChecker {
       }else{
         this.onFrameChange(this.status, this.frameStackCount)
         if( this.frameStackCount == 0 ) this.status = "syncing"
-        if( this.frameStackCount > StatusChecker.syncFrameStackCount ){
+        if( this.frameStackCount == StatusChecker.syncFrameStackCount - 1 ){
           if( this.status == "syncing" ){
             this.status = "receiving"
           }else if( this.status == "idle" ){

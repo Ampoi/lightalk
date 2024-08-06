@@ -1,7 +1,8 @@
 import p5 from "p5";
 import { pixelAmountX, pixelAmountY } from "../constant/settings";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { StatusChecker } from "./status";
+import { getData } from "./getData";
 
 const defaultRect = {
   tl: { x: 50, y: 50 },
@@ -13,8 +14,6 @@ let rect: typeof defaultRect = localStorage.getItem("rect") ? JSON.parse(localSt
 export const setRectDefault = () => {
   rect = defaultRect
 }
-
-export const message = ref("")
 
 const threshold = 140
 
@@ -70,40 +69,46 @@ const drawRect = (p: p5): Record<keyof typeof defaultRect, "black"|"white"> => {
   }
 }
 
-const statusChecker = new StatusChecker((status, frameCount) => {
-  console.log(status, frameCount)
+let tmpFrameStack: Record<"r"|"g"|"b", number>[][] = []
+const receivingBinary = ref<string>()
+export const receivingText = computed(() => {
+  if( receivingBinary.value === undefined ) return undefined
+  let text = ""
+  for( let i = 0; i < receivingBinary.value.length; i += 16 ){
+    const binary = receivingBinary.value.slice(i, i+16)
+    text += String.fromCharCode(parseInt(binary, 2))
+  }
+  return text
 })
 
-export const getData = (tmpFrames: Record<"r"|"g"|"b", number>[][]) => {
-  let data = ""
-  for( let y = 0; y < pixelAmountY; y++ ){
-    for( let x = 0; x < pixelAmountX; x++ ){
-      let rSum = 0
-      let gSum = 0
-      let bSum = 0
-
-      for( const frame of tmpFrames ){
-        const { r,g,b } = frame[y * pixelAmountX + x]
-        rSum += r
-        gSum += g
-        bSum += b
-      }
-
-      const aveR = rSum / tmpFrames.length
-      const aveG = gSum / tmpFrames.length
-      const aveB = bSum / tmpFrames.length
-
-      data += Number(((aveR + aveG + aveB) / 3) > threshold)
+const statusChecker = new StatusChecker((status, frameCount) => {
+  if( status == "receiving" ){
+    const binary = getData(tmpFrameStack)
+    console.log(`[DATA RECEIVED] ${binary}`)
+    
+    if( receivingBinary.value === undefined ) throw new Error("receivingBinary is undefined")
+    receivingBinary.value += binary
+    if(receivingBinary.value.endsWith("1".repeat(16))){
+      console.log("[RECEIVING FINISHED]")
+      statusChecker.cancelConnection("receiving finished")
     }
+    
+    tmpFrameStack = []
+  }else{
+    console.log(`[CONNECTION PROCESSING] status:${status} frameCount:${frameCount}`)
   }
-  return data
-}
+}, (status) => {
+  if( status == "idle" ){
+    receivingBinary.value = undefined
+  }else if( status == "receiving" ){
+    receivingBinary.value = ""
+  }
+})
 
 export const receiver = (p: p5) => {
   let capture: p5.Element
   p.setup = () => {
-    const height = 300
-    p.createCanvas(height / 3 * 4, height)
+    const width = 500
     p.background(0)
     p.noStroke()
 
@@ -112,21 +117,18 @@ export const receiver = (p: p5) => {
       audio: false
     })
     capture.hide()
+    p.createCanvas(width, width * 3 / 4)
   }
-
-  let tmpFrames: Record<"r"|"g"|"b", number>[][] = []
 
   p.draw = () => {
     p.background(0)
     p.image(capture, 0, 0, p.width, p.height)
 
-    if( statusChecker.status ){
-      tmpFrames.push([])
-    }
+    if( statusChecker.status == "receiving" ) tmpFrameStack.push([])
     drawPoints(p, (x, y) => {
-      if( statusChecker.status ){
+      if( statusChecker.status == "receiving" ){
         const [r,g,b] = p.get(x, y)
-        tmpFrames[tmpFrames.length - 1].push({r,g,b})
+        tmpFrameStack[tmpFrameStack.length-1].push({r,g,b})
       }
     })
 
