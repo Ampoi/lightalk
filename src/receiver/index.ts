@@ -1,12 +1,13 @@
 import p5 from "p5";
-import { pixelAmountX, pixelAmountY, syncAmount } from "../constant/settings";
+import { pixelAmountX, pixelAmountY } from "../constant/settings";
 import { ref } from "vue";
+import { StatusChecker } from "./status";
 
 const defaultRect = {
-  tl: { x: 100, y: 100 },
-  tr: { x: 300, y: 100 },
-  bl: { x: 100, y: 300 },
-  br: { x: 300, y: 300 }
+  tl: { x: 50, y: 50 },
+  tr: { x: 100, y: 50 },
+  bl: { x: 50, y: 100 },
+  br: { x: 100, y: 100 }
 }
 let rect: typeof defaultRect = localStorage.getItem("rect") ? JSON.parse(localStorage.getItem("rect")!) : defaultRect
 export const setRectDefault = () => {
@@ -16,9 +17,6 @@ export const setRectDefault = () => {
 export const message = ref("")
 
 const threshold = 140
-
-const minSyncFrameCount = 5
-const maxSyncFrameCount = 20
 
 onbeforeunload = () => {
   console.log("saving")
@@ -48,7 +46,7 @@ const drawPoints = (p: p5, getColor: (x: number, y: number) => void) => {
   }
 }
  
-const drawRect = (p: p5) => {
+const drawRect = (p: p5): Record<keyof typeof defaultRect, "black"|"white"> => {
   const rectColors: Partial<Record<keyof typeof defaultRect, "black"|"white">> = {}
 
   for(const [key,{ x, y }] of Object.entries(rect)){
@@ -64,8 +62,17 @@ const drawRect = (p: p5) => {
     }
   }
 
-  return rectColors
+  const { bl, br, tl, tr } = rectColors
+  if( bl && br && tl && tr ){
+    return { bl, br, tl, tr }
+  }else{
+    throw new Error("rectColors is not complete")
+  }
 }
+
+const statusChecker = new StatusChecker((status, frameCount) => {
+  console.log(status, frameCount)
+})
 
 export const getData = (tmpFrames: Record<"r"|"g"|"b", number>[][]) => {
   let data = ""
@@ -100,71 +107,30 @@ export const receiver = (p: p5) => {
     p.background(0)
     p.noStroke()
 
-    capture = p.createCapture("VIDEO")
+    capture = p.createCapture({
+      video: true,
+      audio: false
+    })
     capture.hide()
   }
 
-  let syncCombo = 0
-  let previousColor: "black" | "white" = "black"
-  let syncFrameCount: number = 0
   let tmpFrames: Record<"r"|"g"|"b", number>[][] = []
-
-  const increaseSyncFrameCount =  () => {
-    syncFrameCount++
-    if( syncFrameCount >= maxSyncFrameCount ){
-      syncFrameCount = 0
-      syncCombo = 0
-    }
-  }
-  
-  const continueSync = (color: "black" | "white") => {
-    if( previousColor === color ){
-      //同じ色のとき
-      increaseSyncFrameCount()
-    }else if( syncFrameCount > minSyncFrameCount ){
-      syncCombo++
-      syncFrameCount = 1
-
-      if( syncCombo > syncAmount ){
-        const data = getData(tmpFrames)
-        message.value += data
-        tmpFrames = []
-      }else{
-        console.log("frameChanged!", syncCombo)
-      }
-    }
-    previousColor = color
-  }
 
   p.draw = () => {
     p.background(0)
     p.image(capture, 0, 0, p.width, p.height)
 
-    if( syncCombo >= syncAmount ){
+    if( statusChecker.status ){
       tmpFrames.push([])
     }
     drawPoints(p, (x, y) => {
-      if( syncCombo >= syncAmount ){
+      if( statusChecker.status ){
         const [r,g,b] = p.get(x, y)
         tmpFrames[tmpFrames.length - 1].push({r,g,b})
       }
     })
 
     const rectColors = drawRect(p)
-
-    const allRectPointColorBlack = Object.values(rectColors).every(color => color === "black")
-    const allRectPointColorWhite = Object.values(rectColors).every(color => color === "white")
-    
-    if( allRectPointColorBlack ){
-      continueSync("black")
-    }else if( allRectPointColorWhite ){
-      continueSync("white")
-    }else if( syncCombo > 0 || syncFrameCount > 0 ) {
-      console.log("sync reset")
-      syncCombo = 0
-      syncFrameCount = 0
-    }
-
-    if( syncCombo == 10 ) message.value = ""
+    statusChecker.step(rectColors)
   }
 }
