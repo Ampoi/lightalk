@@ -6,8 +6,17 @@
         <button @click="setRectDefault">defaultRect</button>
       </div>
       <div ref="receiverCanvas"/>
-      <div class="grow ">
-        {{receivingText}}
+      <div class="grow flex flex-col gap-4 overflow-scroll">
+        <Message
+          v-for="message in messages"
+          :message/>
+        <Message
+          v-if="receivingText"
+          class="opacity-60"
+          :message="{
+            sender: 'communication partner',
+            content: receivingText
+          }"/>
       </div>
       <div class="bg-white border-[1px] border-zinc-300 rounded-xl flex flex-row gap-2 items-center pr-2">
         <input
@@ -27,11 +36,18 @@ import { onMounted, ref } from 'vue';
 import p5 from 'p5';
 import { sender, send } from './sender';
 import { receiver, setRectDefault, receivingText } from './receiver';
+import { messages } from "./messages"
+import Message from "./components/message.vue"
 
 const sendMessage = ref<string>('')
-const onSendButtonClicked = () => {
-  send(sendMessage.value)
+const onSendButtonClicked = async () => {
+  const message = sendMessage.value
   sendMessage.value = ''
+  await send(message)
+  messages.push({
+    sender: "me",
+    content: message
+  })
 }
 
 const senderCanvas = ref<HTMLCanvasElement>()

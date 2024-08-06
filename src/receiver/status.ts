@@ -1,3 +1,5 @@
+import { syncAmount } from "../constant/settings";
+
 type CornerColor = "white" | "black" | "gray"
 type Status = "syncing" | "receiving" | "idle"
 
@@ -15,7 +17,6 @@ export class StatusChecker {
   private static readonly minFrameRepeatCount = 2
   private frameRepeatCount = 0
 
-  private static readonly syncFrameStackCount = 10
   private frameStackCount = 0
   
   private lastCornerColor: CornerColor = "gray"
@@ -56,7 +57,7 @@ export class StatusChecker {
       }else{
         this.onFrameChange(this.status, this.frameStackCount)
         if( this.frameStackCount == 0 ) this.status = "syncing"
-        if( this.frameStackCount == StatusChecker.syncFrameStackCount - 1 ){
+        if( this.frameStackCount == syncAmount - 1 ){
           if( this.status == "syncing" ){
             this.status = "receiving"
           }else if( this.status == "idle" ){

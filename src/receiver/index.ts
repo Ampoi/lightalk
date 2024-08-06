@@ -3,6 +3,7 @@ import { pixelAmountX, pixelAmountY } from "../constant/settings";
 import { computed, ref } from "vue";
 import { StatusChecker } from "./status";
 import { getData } from "./getData";
+import { messages } from "../messages";
 
 const defaultRect = {
   tl: { x: 50, y: 50 },
@@ -91,6 +92,14 @@ const statusChecker = new StatusChecker((status, frameCount) => {
     receivingBinary.value += binary
     if(receivingBinary.value.endsWith("1".repeat(16))){
       console.log("[RECEIVING FINISHED]")
+      
+      const message = receivingText.value
+      if( !message ) throw new Error("receivingBinary is empty")
+      messages.push({
+        sender: "communication partner",
+        content: message
+      })
+
       statusChecker.cancelConnection("receiving finished")
     }
     
